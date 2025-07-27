@@ -1,0 +1,71 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+# RT-DETR-l object detection model with P3-P5 outputs. For details see https://docs.ultralytics.com/models/rtdetr
+
+# Parameters
+nc: 80  # number of classes
+scales: # model compound scaling constants, i.e. 'model=yolov8n-cls.yaml' will call yolov8-cls.yaml with scale 'n'
+  # [depth, width, max_channels]
+  l: [1.00, 1.00, 1024]
+
+
+# 支持下面的版本均可替换
+#  __all__ = ['EMO_1M', 'EMO_2M', 'EMO_5M', 'EMO_6M']
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, EMO_1M, []]  # 4
+
+
+#head:
+ # - [-1, 1, Conv, [256, 1, 1, None, 1, 1, False]]  # 5 input_proj.2
+ # - [-1, 1, AIFI, [1024, 8]] # 6
+  #- [-1, 1, Conv, [256, 1, 1]]  # 7, Y5, lateral_convs.0
+
+  #- [-1, 1, nn.Upsample, [None, 2, 'nearest']] # 8
+  #- [3, 1, Conv, [256, 1, 1, None, 1, 1, False]]  # 9 input_proj.1
+  #- [[-2, -1], 1, Concat, [1]] # 10
+  #- [-1, 3, RepC3, [256, 0.5]]  # 11, fpn_blocks.0
+  #- [-1, 1, Conv, [256, 1, 1]]   # 12, Y4, lateral_convs.1
+
+  #- [-1, 1, nn.Upsample, [None, 2, 'nearest']] # 13
+  #- [2, 1, Conv, [256, 1, 1, None, 1, 1, False]]  # 14 input_proj.0
+  #- [[-2, -1], 1, Concat, [1]]  # 15 cat backbone P4
+  #- [-1, 3, RepC3, [256, 0.5]]    # X3 (16), fpn_blocks.1
+
+ # - [-1, 1, Conv, [256, 3, 2]]   # 17, downsample_convs.0
+ # - [[-1, 12], 1, Concat, [1]]  # 18 cat Y4
+ # - [-1, 3, RepC3, [256, 0.5]]    # F4 (19), pan_blocks.0
+
+ # - [-1, 1, Conv, [256, 3, 2]]   # 20, downsample_convs.1
+  #- [[-1, 7], 1, Concat, [1]]  # 21 cat Y5
+  #- [-1, 3, RepC3, [256, 0.5]]    # F5 (22), pan_blocks.1
+
+  #- [[16, 19, 22], 1, RTDETRDecoder, [nc, 256, 300, 4, 8, 3]]  # Detect(P3, P4, P5)
+head:
+  # 特征投影层 (统一通道数为256)
+  - [2, 1, Conv, [256, 1, 1]]  # 5: P3/8 (1/8分辨率)
+  - [3, 1, Conv, [256, 1, 1]]  # 6: P4/16 (1/16分辨率)
+  - [4, 1, Conv, [256, 1, 1]]  # 7: P5/32 (1/32分辨率)
+
+  # 添加AIFI到深层特征
+  - [7, 1, AIFI, [1024, 8]]  # 8: 增强P5特征 (保持1/32分辨率)
+
+  # 自上而下路径 (P5→P4→P3)
+  - [8, 1, nn.Upsample, [None, 2, 'nearest']]  # 9: P5上采样 (1/32→1/16)
+  - [[9, 6], 1, Bi_FPN, []]  # 10: 融合P5和P4 (1/16)
+  - [-1, 3, RepC3, [256, 0.5]]  # 11: 新P4 (1/16)
+
+  - [11, 1, nn.Upsample, [None, 2, 'nearest']]  # 12: P4上采样 (1/16→1/8)
+  - [[12, 5], 1, Bi_FPN, []]  # 13: 融合P4和P3 (1/8)
+  - [-1, 3, RepC3, [256, 0.5]]  # 14: 新P3 (1/8)
+
+  # 自下而上路径 (P3→P4→P5)
+  - [14, 1, Conv, [256, 3, 2]]  # 15: P3下采样 (1/8→1/16)
+  - [[15, 11], 1, Bi_FPN, []]  # 16: 融合下采样P3和新P4 (1/16)
+  - [-1, 3, RepC3, [256, 0.5]]  # 17: 更新P4 (1/16)
+
+  - [17, 1, Conv, [256, 3, 2]]  # 18: P4下采样 (1/16→1/32)
+  - [[18, 8], 1, Bi_FPN, []]  # 19: 融合下采样P4和增强P5 (1/32)
+  - [-1, 3, RepC3, [256, 0.5]]  # 20: 更新P5 (1/32)
+
+  # 检测头 (使用最终更新后的特征)
+  - [[14, 17, 20], 1, RTDETRDecoder, [nc, 256, 300, 4, 8, 3]]  # 输入P3(1/8), P4(1/16), P5(1/32)
