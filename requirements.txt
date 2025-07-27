@@ -36,7 +36,7 @@ PyQt5_sip==12.13.0
 PyQt6_sip==13.9.1
 PySocks==1.7.1
 python-dateutil==2.9.0.post0
-pytz==2024.1
+pytz==2025.2
 PyYAML==6.0.2
 requests==2.32.3
 safetensors==0.5.3
