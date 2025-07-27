@@ -21,7 +21,7 @@ mkl_random==1.2.8
 mkl-service==2.4.0
 mpmath==1.3.0
 networkx==3.2.1
-numexpr==2.10.1
+numexpr==2.10.2
 numpy==1.23.5
 opencv-python==4.10.0
 opencv-python-headless==4.10.0
